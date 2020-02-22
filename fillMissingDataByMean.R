@@ -28,6 +28,7 @@ fillMissingDataByMean <- function(myData){
   myData[myData == ".a"] <- NA
   myData[myData == ".b"] <- NA
   myData[myData == ".c"] <- NA
+  myData[myData == ""] <- NA
   
   noMissing <- vector()
   for(i in 1:nrow(textDataShort)){

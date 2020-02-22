@@ -1,4 +1,3 @@
-
 source("./getData.R")
 source("./fillMissingDataByMean.R")
 

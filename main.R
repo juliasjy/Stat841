@@ -1,17 +1,23 @@
 source("./getData.R")
 source("./fillMissingDataByMean.R")
+source("./convertDataType.R")
 
-train_data <- fillMissingDataByMean(getData("train.csv"))
+train_data <- convertDataType(getData("train.csv"))
+train_data <- fillMissingDataByMean(train_data)
+
+
+
 test_data <- fillMissingDataByMean(getData("test.csv"))
+test_data <- convertDataType(test_data)
 
-###################################
+####################################
 ### cleaning
 
 #set.seed(222)
 #train_data.imputed <- rfImpute(satisfied ~ ., train_data)
 
 
-###################################
+############## knn #####################
 library(class)
 library(ggplot2)
 

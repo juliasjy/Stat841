@@ -1,18 +1,15 @@
-getData <- function(name){
-  data <- read.csv(paste0("./eurosat-w2020/", name))
-  return (data)
-}
 
-train_data <- getData("train.csv")
-test_data <- getData("test.csv")
+source("./getData.R")
+source("./fillMissingDataByMean.R")
+
+train_data <- fillMissingDataByMean(getData("train.csv"))
+test_data <- fillMissingDataByMean(getData("test.csv"))
 
 ###################################
 ### cleaning
 
-
-
-
-
+#set.seed(222)
+#train_data.imputed <- rfImpute(satisfied ~ ., train_data)
 
 
 ###################################

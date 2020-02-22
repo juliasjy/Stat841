@@ -32,11 +32,7 @@ fillMissingDataByMean <- function(myData){
   
   noMissing <- vector()
   for(i in 1:nrow(textDataShort)){
-    if(textDataShort$Obs[i] == 39325){
-      noMissing <- c(noMissing, i)
-    }else{
       myData[is.na(myData[i+1]), i+1] <- textDataShort$Mean[i]
-    }
   }
   return (myData)
 }

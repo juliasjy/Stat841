@@ -1,14 +1,10 @@
 source("./getData.R")
 source("./fillMissingDataByMean.R")
-source("./convertDataType.R")
-
-train_data <- convertDataType(getData("train.csv"))
+library(beepr)
+train_data <- getData("train.csv")
 train_data <- fillMissingDataByMean(train_data)
 
-
-
 test_data <- fillMissingDataByMean(getData("test.csv"))
-test_data <- convertDataType(test_data)
 
 ####################################
 ### cleaning
@@ -31,21 +27,21 @@ train.y <- train_data[trainInx, ncol(train_data)]
 test.y <- train_data[-trainInx, ncol(train_data)]
 
 ## knn
-k_range <- c(1:10) # range of k
+k_range <- c(11,13,15) # range of k
 err.df <- data.frame(k = rep(0, length(k_range)),
-                     train.err = rep(0, length(k_range)),
                      test.err = rep(0, length(k_range)))
 i <- 1
 for(k in k_range){
   knn.test.pred <- knn(train = train.X, test = test.X, cl = train.y, k = k) # knn for test data
-  knn.train.pred <- knn(train = train.X, test = train.X, cl = train.y, k = k) # knn for training data
-  train.err <- mean(train.y != knn.train.pred) # training error
+  # knn.train.pred <- knn(train = train.X, test = train.X, cl = train.y, k = k) # knn for training data
+  # train.err <- mean(train.y != knn.train.pred) # training error
   test.err <- mean(test.y != knn.test.pred) # test error
   
   # err.df each row three columns: k, training error, test error
-  err.df[i,] <- c(k, train.err, test.err)
+  err.df[i,] <- c(k, test.err)
   
   i <- i+1
+  beep()
 }
 
 
@@ -62,3 +58,9 @@ ggplot(err.df.plot) + geom_line(aes(x = k, y = value,
                      values=c("red","blue")) +
   theme_bw()
 
+### randomForest
+library(randomForest)
+rf <- randomForest(x = train.X, y = train.y, xtest = test.X, ytest = test.y, ntree = 250)
+beep()
+testpredicted <- rf$test$predicted
+err <- sum(test.y != testpredicted)/length(test.y)

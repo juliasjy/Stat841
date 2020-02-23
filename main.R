@@ -1,19 +1,12 @@
-source("./getData.R")
-source("./fillMissingDataByMean.R")
+source("./function/getData.R")
+source("./function/fillMissingDataByMean.R")
 library(beepr)
 train_data <- getData("train.csv")
 train_data <- fillMissingDataByMean(train_data)
 
-test_data <- fillMissingDataByMean(getData("test.csv"))
+test_data <- getData("test.csv")
+test_data <- fillMissingDataByMean(test_data)
 
-####################################
-### cleaning
-
-#set.seed(222)
-#train_data.imputed <- rfImpute(satisfied ~ ., train_data)
-
-
-############## knn #####################
 library(class)
 library(ggplot2)
 
@@ -21,8 +14,8 @@ library(ggplot2)
 set.seed(20200214)
 trainSize <- floor(nrow(train_data)*0.75)
 trainInx <- sample(seq_len(nrow(train_data)),size = trainSize)
-train.X <- train_data[trainInx, 2:(ncol(train_data)-1)]
-test.X <- train_data[-trainInx, 2:(ncol(train_data)-1)]
+train.x <- train_data[trainInx, 2:(ncol(train_data)-1)]
+test.x <- train_data[-trainInx, 2:(ncol(train_data)-1)]
 train.y <- train_data[trainInx, ncol(train_data)]
 test.y <- train_data[-trainInx, ncol(train_data)]
 
@@ -32,8 +25,8 @@ err.df <- data.frame(k = rep(0, length(k_range)),
                      test.err = rep(0, length(k_range)))
 i <- 1
 for(k in k_range){
-  knn.test.pred <- knn(train = train.X, test = test.X, cl = train.y, k = k) # knn for test data
-  # knn.train.pred <- knn(train = train.X, test = train.X, cl = train.y, k = k) # knn for training data
+  knn.test.pred <- knn(train = train.x, test = test.X, cl = train.y, k = k) # knn for test data
+  # knn.train.pred <- knn(train = train.x, test = train.x, cl = train.y, k = k) # knn for training data
   # train.err <- mean(train.y != knn.train.pred) # training error
   test.err <- mean(test.y != knn.test.pred) # test error
   
@@ -60,7 +53,15 @@ ggplot(err.df.plot) + geom_line(aes(x = k, y = value,
 
 ### randomForest
 library(randomForest)
-rf <- randomForest(x = train.X, y = train.y, xtest = test.X, ytest = test.y, ntree = 250)
+rf <- randomForest(x = train.x, y = train.y, xtest = test.X, ytest = test.y, ntree = 250)
 beep()
 testpredicted <- rf$test$predicted
-err <- sum(test.y != testpredicted)/length(test.y)
+err <- sum(test.y != round(testpredicted))/length(test.y)
+
+train.x <- train_data[, -c(1,ncol(train_data))]
+train.y <- train_data[,"satisfied"]
+test.x <- test_data[,-1]
+rf_final <- randomForest(x = train.x, y = train.y, xtest = test.x, ntree = 250)
+beep()
+testpredicted <- rf_final$test$predicted
+write.csv(unlist(round(testpredicted)),"./result.csv")

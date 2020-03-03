@@ -81,8 +81,9 @@ err <- mean(testpredicted != test.y) # 0.1910904
 #train on whole sample set
 boost <- gbm(satisfied~., data = train_data, distribution = "gaussian", n.trees = 500,
              interaction.depth = 4)
-predict.boosting <- round(predict(boost, newdata = test.x, n.trees = 500) - 1)
-write.csv(unlist(round(predict.rf)),"./resultBoost.csv")
+predict.boosting <- round(predict(boost, newdata = test_data, n.trees = 500) - 1)
+beep()
+write.csv(unlist(round(predict.boosting)),"./resultBoost.csv")
 
 ## adaboost
 library(adabag)
@@ -93,8 +94,21 @@ predicttest <- predict(adaboost, test.x)
 err <- mean(predicttest$class != test.y) #0.1922872
 #train on whole sample set
 adaboost <- boosting(satisfied~., data = train_data, mfinal = 50)
-predict.ada <- predict(adaboost, test.x)
+predict.ada <- predict(adaboost, test_data)
+beep()
 write.csv(unlist(predict.ada$class),"./resultAdaBoost.csv")
+
+## fastAdaBoost
+library(fastAdaboost)
+train <- cbind(train.x, train.y)
+adaboost1 <- adaboost(train.y~., data = train, nIter = 50)
+predicttest <- predict(adaboost, test.x)
+err <- mean(predicttest$class != test.y)
+#train on whole sample set
+adaboost1 <- adaboost(satisfied~., data = train_data, nIter = 50)
+predict.ada1 <- predict(adaboost1, test_data)
+beep()
+write.csv(unlist(predict.ada1$class),"./resultAdaBoost1.csv")
 
 ## Neural Network - doesnt work
 library(neuralnet)
@@ -126,7 +140,7 @@ write.csv(unlist(predict.gb),"./resultGB.csv")
 library(e1071)
 train <- cbind(train.x, train.y)
 svm.tune <- tune(svm, train.y~., data = train, kernel = "radial",
-           ranges = list(cost = c(0.1, 1, 10, 100, 1000), gamma = c(0.5, 1, 2, 3, 4)))
+                 ranges = list(cost = c(0.1, 1, 10, 100, 1000), gamma = c(0.5, 1, 2, 3, 4)))
 summary(svm.tune)
 predict.svm <- predict(tune.out$best.model, test.x)
 beep()

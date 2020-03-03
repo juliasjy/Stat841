@@ -1,5 +1,5 @@
-source("./unletter.R")
-source("./normalize.R")
+source("./function/unletter.R")
+source("./function/normalize.R")
 fillMissingDataByMean <- function(myData){
   textDataShort <- read.csv("./eurosat-w2020/codebook_compact.csv", header = T, stringsAsFactors = F)
   myData[myData == ".a"] <- NA

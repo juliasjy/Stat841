@@ -1,26 +1,31 @@
 source("./function/getData.R")
-source("./function/fillMissingDataByMean.R")
+source("./function/fillMissingDataByMeanAllNumeric.R")
+source("./function/fillMissingDataByMeanCountryNonNumeric.R")
 
 library(beepr)
 train_data <- getData("train.csv")
-train_data <- fillMissingDataByMean(train_data)
-
 test_data <- getData("test.csv")
-test_data <- fillMissingDataByMean(test_data)
 
-library(class)
-library(ggplot2)
+#train_data <- fillMissingDataByMeanAllNumeric(train_data)
+#test_data <- fillMissingDataByMeanAllNumeric(test_data)
+
+train_data <- fillMissingDataByMeanCountryNonNumeric(train_data)
+test_data <- fillMissingDataByMeanCountryNonNumeric(test_data)
+
+train_data$satisfied <- as.factor(train_data$satisfied)
 
 #### Split training and test data (75%, 25%) ####
 set.seed(20200214)
 trainSize <- floor(nrow(train_data)*0.75)
 trainInx <- sample(seq_len(nrow(train_data)),size = trainSize)
-train.x <- train_data[trainInx, 2:(ncol(train_data)-1)]
-test.x <- train_data[-trainInx, 2:(ncol(train_data)-1)]
-train.y <- as.factor(train_data[trainInx, ncol(train_data)])
-test.y <- as.factor(train_data[-trainInx, ncol(train_data)])
+train.x <- train_data[trainInx, -ncol(train_data)]
+test.x <- train_data[-trainInx, -ncol(train_data)]
+train.y <- train_data[trainInx, "satisfied"]
+test.y <- train_data[-trainInx, "satisfied"]
 
 ## knn
+library(ggplot2)
+library(class)
 k_range <- c(11,13,15) # range of k
 err.df <- data.frame(k = rep(0, length(k_range)),
                      test.err = rep(0, length(k_range)))
@@ -37,8 +42,6 @@ for(k in k_range){
   i <- i+1
   beep()
 }
-
-
 err.df.plot <- reshape2::melt(err.df, id.vars = "k")
 ggplot(err.df.plot) + geom_line(aes(x = k, y = value,
                                     color = variable)) +
@@ -54,18 +57,18 @@ ggplot(err.df.plot) + geom_line(aes(x = k, y = value,
 
 ### randomForest
 library(randomForest)
-rf <- randomForest(x = train.x, y = train.y, xtest = test.X, ytest = test.y, ntree = 250)
+rf <- randomForest(x = train.x, y = train.y, xtest = test.x, ytest = test.y, ntree = 250)
 beep()
 testpredicted <- rf$test$predicted
-err <- sum(test.y != round(testpredicted))/length(test.y)
-
-train.x <- train_data[, -c(1,ncol(train_data))]
-train.y <- train_data[,"satisfied"]
-test.x <- test_data[,-1]
-rf_final <- randomForest(x = train.x, y = train.y, xtest = test.x, ntree = 250)
+err.rf <- mean(test.y != round(testpredicted)) # 0.1855
+#train on whole sample set
+train_data.x <- train_data[, -c(1,ncol(train_data))]
+train_data.y <- train_data[,"satisfied"]
+test_data.x <- test_data[,-1]
+rf_final <- randomForest(x = train_data.x, y = train_data.y, xtest = test_data.x, ntree = 500)
 beep()
-testpredicted <- rf_final$test$predicted
-write.csv(unlist(round(testpredicted)),"./result.csv")
+predict.rf <- rf_final$test$predicted
+write.csv(unlist(round(predict.rf)),"./resultRF.csv")
 
 ## boosting
 library(gbm)
@@ -73,14 +76,25 @@ train <- cbind(train.x, train.y)
 boost <- gbm(train.y~., data = train, distribution = "gaussian", n.trees = 250,
              interaction.depth = 4)
 summary(boost)
-predict.y <- round(predict(boost, newdata = test.x, n.trees = 250))
-mean((predict.y - test.y)^2)
+testpredicted <- round(predict(boost, newdata = test.x, n.trees = 250) - 1)
+err <- mean(testpredicted != test.y) # 0.1910904
+#train on whole sample set
+boost <- gbm(satisfied~., data = train_data, distribution = "gaussian", n.trees = 500,
+             interaction.depth = 4)
+predict.boosting <- round(predict(boost, newdata = test.x, n.trees = 500) - 1)
+write.csv(unlist(round(predict.rf)),"./resultBoost.csv")
 
-## adaboost - doesnt work
+## adaboost
 library(adabag)
 library(caret)
 train <- cbind(train.x, train.y)
 adaboost <- boosting(train.y~., data = train, mfinal = 50)
+predicttest <- predict(adaboost, test.x)
+err <- mean(predicttest$class != test.y) #0.1922872
+#train on whole sample set
+adaboost <- boosting(satisfied~., data = train_data, mfinal = 50)
+predict.ada <- predict(adaboost, test.x)
+write.csv(unlist(predict.ada$class),"./resultAdaBoost.csv")
 
 ## Neural Network - doesnt work
 library(neuralnet)
@@ -89,7 +103,6 @@ nn <- neuralnet(train.y~., data = train, hidden = c(3,2),
                 err.fct = "ce",
                 linear.output = F)
 predict.nn <- predict(nn, test.x)
-
 
 ## Gradient Boosting
 library(tidyverse)
@@ -100,14 +113,29 @@ gb <- caret::train(as.factor(train.y)~., data = train, method = "xgbTree",
                    trControl = trainControl("cv", number = 10))
 predict.gb <- predict(gb, test.x)
 sum(predict.gb != test.y)/nrow(test.x) #0.1844415
-
 predict.gb.test <- predict(gb, test_data[,2:ncol(test_data)])
-result <- read.csv("./result.csv", header = T)
-sum(result$x != predict.gb.test) # 456 different results
-write.csv(unlist(predict.gb.test),"./resultGB.csv")
+result.RF <- read.csv("./resultRF.csv", header = T)
+sum(result.RF$x != predict.gb.test) # 456 different results
+#train on whole sample set
+gb <- caret::train(satisfied~., data = train_data, method = "xgbTree",
+                   trControl = trainControl("cv", number = 10))
+predict.gb <- predict(gb, test_data)
+write.csv(unlist(predict.gb),"./resultGB.csv")
 
 ## SVM
 library(e1071)
-svm <- svm(train.y~., data = train, kernel = "linear",
-           cost = 10, scale = F)
-predict.svm <- predict(svm, test.x)
+train <- cbind(train.x, train.y)
+svm.tune <- tune(svm, train.y~., data = train, kernel = "radial",
+           ranges = list(cost = c(0.1, 1, 10, 100, 1000), gamma = c(0.5, 1, 2, 3, 4)))
+summary(svm.tune)
+predict.svm <- predict(tune.out$best.model, test.x)
+beep()
+
+## Combine All Result
+result.RF <- read.csv("./resultRF.csv", header = T)
+result.GB <- read.csv("./resultGB.csv", header = T)
+result.AdaBoost <- read.csv("./resultAdaBoost.csv", header = T)
+result.Boost <- read.csv("./resultBoost.csv", header = T)
+
+result <- (result.RF$x + result.GB$x + result.AdaBoost$x + result.Boost$x)/4
+

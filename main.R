@@ -1,5 +1,6 @@
 source("./function/getData.R")
 source("./function/fillMissingDataByMean.R")
+
 library(beepr)
 train_data <- getData("train.csv")
 train_data <- fillMissingDataByMean(train_data)
@@ -16,8 +17,8 @@ trainSize <- floor(nrow(train_data)*0.75)
 trainInx <- sample(seq_len(nrow(train_data)),size = trainSize)
 train.x <- train_data[trainInx, 2:(ncol(train_data)-1)]
 test.x <- train_data[-trainInx, 2:(ncol(train_data)-1)]
-train.y <- train_data[trainInx, ncol(train_data)]
-test.y <- train_data[-trainInx, ncol(train_data)]
+train.y <- as.factor(train_data[trainInx, ncol(train_data)])
+test.y <- as.factor(train_data[-trainInx, ncol(train_data)])
 
 ## knn
 k_range <- c(11,13,15) # range of k
@@ -65,3 +66,48 @@ rf_final <- randomForest(x = train.x, y = train.y, xtest = test.x, ntree = 250)
 beep()
 testpredicted <- rf_final$test$predicted
 write.csv(unlist(round(testpredicted)),"./result.csv")
+
+## boosting
+library(gbm)
+train <- cbind(train.x, train.y)
+boost <- gbm(train.y~., data = train, distribution = "gaussian", n.trees = 250,
+             interaction.depth = 4)
+summary(boost)
+predict.y <- round(predict(boost, newdata = test.x, n.trees = 250))
+mean((predict.y - test.y)^2)
+
+## adaboost - doesnt work
+library(adabag)
+library(caret)
+train <- cbind(train.x, train.y)
+adaboost <- boosting(train.y~., data = train, mfinal = 50)
+
+## Neural Network - doesnt work
+library(neuralnet)
+train <- cbind(train.x, train.y)
+nn <- neuralnet(train.y~., data = train, hidden = c(3,2),
+                err.fct = "ce",
+                linear.output = F)
+predict.nn <- predict(nn, test.x)
+
+
+## Gradient Boosting
+library(tidyverse)
+library(caret)
+library(xgboost)
+train <- cbind(train.x, train.y)
+gb <- caret::train(as.factor(train.y)~., data = train, method = "xgbTree",
+                   trControl = trainControl("cv", number = 10))
+predict.gb <- predict(gb, test.x)
+sum(predict.gb != test.y)/nrow(test.x) #0.1844415
+
+predict.gb.test <- predict(gb, test_data[,2:ncol(test_data)])
+result <- read.csv("./result.csv", header = T)
+sum(result$x != predict.gb.test) # 456 different results
+write.csv(unlist(predict.gb.test),"./resultGB.csv")
+
+## SVM
+library(e1071)
+svm <- svm(train.y~., data = train, kernel = "linear",
+           cost = 10, scale = F)
+predict.svm <- predict(svm, test.x)
